@@ -1,4 +1,4 @@
-import platform, re, subprocess, threading, time, logging
+import os, platform, re, subprocess, threading, time, logging
 from datetime import datetime
 from flask import current_app
 from ..extensions import db
@@ -6,7 +6,12 @@ from ..models import Device, MonitoringResult, ActivityLog
 from .alert_service import process_transition
 
 log = logging.getLogger(__name__)
-_scheduler_started = False
+
+def should_start_monitoring(app, debug_mode):
+    """Run only in the serving process, not Flask's debug reloader parent."""
+    if not app.config.get('START_MONITORING', True) or app.testing:
+        return False
+    return not debug_mode or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
 
 def ping_host(host, timeout=2):
     system = platform.system().lower()
@@ -45,12 +50,14 @@ def monitor_all_devices():
             db.session.rollback(); log.exception('Monitoring failed for device %s', device.id)
 
 def start_scheduler(app):
-    global _scheduler_started
-    if _scheduler_started: return
-    _scheduler_started = True
+    # Keep this state on the Flask app: one app instance gets one worker.
+    if app.extensions.get('netpulse_monitoring_worker_started'):
+        return False
+    app.extensions['netpulse_monitoring_worker_started'] = True
     def worker():
         with app.app_context():
             while True:
                 monitor_all_devices(); time.sleep(app.config['MONITOR_INTERVAL'])
     threading.Thread(target=worker, daemon=True, name='netpulse-monitor').start()
     log.info('Monitoring worker started')
+    return True

@@ -25,7 +25,4 @@ def create_app(test_config=None):
     @app.errorhandler(403)
     def forbidden(_): return jsonify(error='Permission denied'), 403
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
-    if app.config.get('START_MONITORING', True) and not app.testing and os.environ.get('WERKZEUG_RUN_MAIN') in (None, 'true'):
-        from .services.monitoring_service import start_scheduler
-        start_scheduler(app)
     return app
