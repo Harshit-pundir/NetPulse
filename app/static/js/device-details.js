@@ -1,0 +1,3 @@
+let chart;
+async function loadDetail(){let [h,u]=await Promise.all([fetch(`/api/devices/${deviceId}/history?hours=24`).then(r=>r.json()),fetch(`/api/devices/${deviceId}/uptime`).then(r=>r.json())]);chart?.destroy();chart=new Chart(historyChart,{type:'line',data:{labels:h.history.map(x=>new Date(x.checked_at).toLocaleTimeString()),datasets:[{label:'Latency (ms)',data:h.history.map(x=>x.latency),borderColor:'#4f9cff',tension:.3}]}});uptime.innerHTML=['1','24','168'].map(k=>`<div class="item">Last ${k==='168'?'7 days':k+' hour'+(k==='1'?'':'s')}: <b>${u[k]===null?'Insufficient data':u[k]+'%'}</b></div>`).join('')}
+loadDetail();
