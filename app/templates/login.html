@@ -1,1 +1,16 @@
-{% extends 'base.html' %}{% block title %}Sign in · NetPulse{% endblock %}{% block content %}<section class="login"><h1>Net<span>Pulse</span></h1><p>Network health, in focus.</p><form method="post"><label>Username<input name="username" required autofocus></label><label>Password<input type="password" name="password" required></label><button>Sign in</button></form><small>Development: admin / admin123</small></section>{% endblock %}
+{% extends "base.html" %}
+
+{% block title %}Sign in · NetPulse{% endblock %}
+
+{% block content %}
+<section class="login">
+    <h1>Net<span>Pulse</span></h1>
+    <p>Network health, in focus.</p>
+    <form method="post">
+        <label>Username<input name="username" required autofocus></label>
+        <label>Password<input type="password" name="password" required></label>
+        <button type="submit">Sign in</button>
+    </form>
+    <small>Development: admin / admin123</small>
+</section>
+{% endblock %}

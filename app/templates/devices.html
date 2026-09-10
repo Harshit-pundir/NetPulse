@@ -1,1 +1,40 @@
-{% extends 'base.html' %}{% block content %}<header><div><h2>Devices</h2><p>Inventory and monitor configuration.</p></div>{% if current_user.role=='ADMIN' %}<button onclick="showForm()">Add device</button>{% endif %}</header>{% if current_user.role=='ADMIN' %}<section id="editor" class="editor hidden"><h3 id="formTitle">Add device</h3><form id="deviceForm"><input type="hidden" id="id"><input id="name" placeholder="Name" required><input id="ip_address" placeholder="IP address or hostname" required><select id="device_type">{% for t in types %}<option>{{t}}</option>{% endfor %}</select><input id="location" placeholder="Location"><input id="hostname" placeholder="Hostname"><textarea id="description" placeholder="Description"></textarea><button>Save device</button><button type="button" onclick="hideForm()">Cancel</button></form></section>{% endif %}<input id="search" placeholder="Search devices" oninput="load()"><article><div class="table-wrap"><table><thead><tr><th>Name</th><th>Address</th><th>Type</th><th>Location</th><th>Status</th><th>Latency</th><th>Monitoring</th><th>Actions</th></tr></thead><tbody id="devices"></tbody></table></div></article>{% endblock %}{% block scripts %}<script>const admin={{ 'true' if current_user.role=='ADMIN' else 'false' }};</script><script src="{{url_for('static',filename='js/devices.js')}}"></script>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<header>
+    <div><h2>Devices</h2><p>Inventory and monitor configuration.</p></div>
+    {% if current_user.role == "ADMIN" %}<button onclick="showForm()">Add device</button>{% endif %}
+</header>
+
+{% if current_user.role == "ADMIN" %}
+<section id="editor" class="editor hidden">
+    <h3 id="formTitle">Add device</h3>
+    <form id="deviceForm">
+        <input type="hidden" id="id">
+        <input id="name" placeholder="Name" required>
+        <input id="ip_address" placeholder="IP address or hostname" required>
+        <select id="device_type">{% for type in types %}<option>{{ type }}</option>{% endfor %}</select>
+        <input id="location" placeholder="Location">
+        <input id="hostname" placeholder="Hostname">
+        <textarea id="description" placeholder="Description"></textarea>
+        <button type="submit">Save device</button>
+        <button type="button" onclick="hideForm()">Cancel</button>
+    </form>
+</section>
+{% endif %}
+
+<input id="search" placeholder="Search devices" oninput="loadDevices()">
+<article>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>Address</th><th>Type</th><th>Location</th><th>Status</th><th>Latency</th><th>Monitoring</th><th>Actions</th></tr></thead>
+            <tbody id="devices"></tbody>
+        </table>
+    </div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>const admin = {{ 'true' if current_user.role == 'ADMIN' else 'false' }};</script>
+<script src="{{ url_for('static', filename='js/devices.js') }}"></script>
+{% endblock %}

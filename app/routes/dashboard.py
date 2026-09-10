@@ -1,32 +1,88 @@
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, jsonify
+
+from flask import Blueprint, jsonify, render_template
 from flask_login import login_required
-from sqlalchemy import func
-from ..models import Device, Alert, ActivityLog, MonitoringResult
+
+from ..models import ActivityLog, Alert, Device, MonitoringResult
 from .helpers import device_json
-bp=Blueprint('dashboard',__name__)
-@bp.route('/')
+
+bp = Blueprint("dashboard", __name__)
+
+
+@bp.route("/")
 @login_required
-def index(): return render_template('dashboard.html')
-@bp.get('/api/dashboard/summary')
+def index():
+    return render_template("dashboard.html")
+
+
+@bp.get("/api/dashboard/summary")
 @login_required
 def summary():
-    devices=Device.query.all(); counts={s:sum(d.status==s for d in devices) for s in ('ONLINE','OFFLINE','WARNING','UNKNOWN')}
-    values=[d.current_latency for d in devices if d.current_latency is not None]
-    return jsonify(total=len(devices), online=counts['ONLINE'],offline=counts['OFFLINE'],warning=counts['WARNING'],unknown=counts['UNKNOWN'],active_alerts=Alert.query.filter_by(acknowledged=False).count(),average_latency=round(sum(values)/len(values),1) if values else None,devices=[device_json(d) for d in devices])
-@bp.get('/api/dashboard/latency')
+    devices = Device.query.all()
+    status_counts = {"ONLINE": 0, "OFFLINE": 0, "WARNING": 0, "UNKNOWN": 0}
+    latency_values = []
+
+    for device in devices:
+        status_counts[device.status] = status_counts.get(device.status, 0) + 1
+        if device.current_latency is not None:
+            latency_values.append(device.current_latency)
+
+    average_latency = None
+    if latency_values:
+        average_latency = round(sum(latency_values) / len(latency_values), 1)
+
+    return jsonify(
+        total=len(devices),
+        online=status_counts["ONLINE"],
+        offline=status_counts["OFFLINE"],
+        warning=status_counts["WARNING"],
+        unknown=status_counts["UNKNOWN"],
+        active_alerts=Alert.query.filter_by(acknowledged=False).count(),
+        average_latency=average_latency,
+        devices=[device_json(device) for device in devices],
+    )
+
+
+@bp.get("/api/dashboard/latency")
 @login_required
 def latency():
-    since=datetime.utcnow()-timedelta(hours=24)
-    rows=dbrows=MonitoringResult.query.filter(MonitoringResult.checked_at>=since,MonitoringResult.latency.isnot(None)).order_by(MonitoringResult.checked_at.desc()).limit(100).all()
-    return jsonify(points=[{'time':r.checked_at.isoformat(),'latency':r.latency,'device':r.device.name} for r in reversed(rows)])
-@bp.get('/api/dashboard/alerts')
+    start_time = datetime.utcnow() - timedelta(hours=24)
+    results = MonitoringResult.query.filter(
+        MonitoringResult.checked_at >= start_time,
+        MonitoringResult.latency.isnot(None),
+    ).order_by(MonitoringResult.checked_at.desc()).limit(100).all()
+
+    points = []
+    for result in reversed(results):
+        points.append({
+            "time": result.checked_at.isoformat(),
+            "latency": result.latency,
+            "device": result.device.name,
+        })
+    return jsonify(points=points)
+
+
+@bp.get("/api/dashboard/alerts")
 @login_required
 def recent_alerts():
-    alerts=Alert.query.order_by(Alert.created_at.desc()).limit(8).all()
-    return jsonify(alerts=[{'id':a.id,'device':a.device.name,'severity':a.severity,'message':a.message,'acknowledged':a.acknowledged,'created_at':a.created_at.isoformat()} for a in alerts])
-@bp.get('/api/dashboard/activity')
+    alerts = Alert.query.order_by(Alert.created_at.desc()).limit(8).all()
+    return jsonify(alerts=[{
+        "id": alert.id,
+        "device": alert.device.name,
+        "severity": alert.severity,
+        "message": alert.message,
+        "acknowledged": alert.acknowledged,
+        "created_at": alert.created_at.isoformat(),
+    } for alert in alerts])
+
+
+@bp.get("/api/dashboard/activity")
 @login_required
 def activity():
-    logs=ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(8).all()
-    return jsonify(activity=[{'device':a.device.name if a.device else 'System','event_type':a.event_type,'message':a.message,'created_at':a.created_at.isoformat()} for a in logs])
+    logs = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(8).all()
+    return jsonify(activity=[{
+        "device": log.device.name if log.device else "System",
+        "event_type": log.event_type,
+        "message": log.message,
+        "created_at": log.created_at.isoformat(),
+    } for log in logs])

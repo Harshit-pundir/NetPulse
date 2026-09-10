@@ -1,1 +1,37 @@
-{% extends 'base.html' %}{% block content %}<header><div><h2>Network overview</h2><p>Live health signals from this NetPulse instance.</p></div><span id="updated"></span></header><section class="metrics" id="metrics"></section><section class="grid"><article><h3>Device status</h3><canvas id="statusChart"></canvas></article><article><h3>Recent latency</h3><canvas id="latencyChart"></canvas></article></section><section class="grid"><article><h3>Recent alerts</h3><div id="alerts"></div></article><article><h3>Recent activity</h3><div id="activity"></div></article></section><article><h3>Device health</h3><div class="table-wrap"><table><thead><tr><th>Device</th><th>Address</th><th>Type</th><th>Status</th><th>Latency</th><th>Last checked</th></tr></thead><tbody id="health"></tbody></table></div></article>{% endblock %}{% block scripts %}<script src="{{url_for('static',filename='js/dashboard.js')}}"></script>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<header>
+    <div>
+        <h2>Network overview</h2>
+        <p>Live health signals from this NetPulse instance.</p>
+    </div>
+    <span id="updated"></span>
+</header>
+
+<section class="metrics" id="metrics"></section>
+
+<section class="grid">
+    <article><h3>Device status</h3><canvas id="statusChart"></canvas></article>
+    <article><h3>Recent latency</h3><canvas id="latencyChart"></canvas></article>
+</section>
+
+<section class="grid">
+    <article><h3>Recent alerts</h3><div id="alerts"></div></article>
+    <article><h3>Recent activity</h3><div id="activity"></div></article>
+</section>
+
+<article>
+    <h3>Device health</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Device</th><th>Address</th><th>Type</th><th>Status</th><th>Latency</th><th>Last checked</th></tr></thead>
+            <tbody id="health"></tbody>
+        </table>
+    </div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

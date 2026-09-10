@@ -1,1 +1,11 @@
-{% extends 'base.html' %}{% block content %}<header><div><h2>Activity logs</h2><p>Device and alert events.</p></div></header><article><div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Device</th><th>IP</th><th>Event</th><th>Message</th></tr></thead><tbody id="logs"></tbody></table></div></article>{% endblock %}{% block scripts %}<script src="{{url_for('static',filename='js/logs.js')}}"></script>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<header><div><h2>Activity logs</h2><p>Device and alert events.</p></div></header>
+<article><div class="table-wrap"><table>
+    <thead><tr><th>Timestamp</th><th>Device</th><th>IP</th><th>Event</th><th>Message</th></tr></thead>
+    <tbody id="logs"></tbody>
+</table></div></article>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/logs.js') }}"></script>{% endblock %}

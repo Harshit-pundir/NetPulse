@@ -1,1 +1,14 @@
-{% extends 'base.html' %}{% block content %}<header><div><h2>Alerts</h2><p>Conditions requiring attention.</p></div></header><article><div class="table-wrap"><table><thead><tr><th>Severity</th><th>Device</th><th>Type</th><th>Message</th><th>Time</th><th>Status</th></tr></thead><tbody id="alerts"></tbody></table></div></article>{% endblock %}{% block scripts %}<script>const admin={{'true' if current_user.role=='ADMIN' else 'false'}};</script><script src="{{url_for('static',filename='js/alerts.js')}}"></script>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<header><div><h2>Alerts</h2><p>Conditions requiring attention.</p></div></header>
+<article><div class="table-wrap"><table>
+    <thead><tr><th>Severity</th><th>Device</th><th>Type</th><th>Message</th><th>Time</th><th>Status</th></tr></thead>
+    <tbody id="alerts"></tbody>
+</table></div></article>
+{% endblock %}
+
+{% block scripts %}
+<script>const admin = {{ 'true' if current_user.role == 'ADMIN' else 'false' }};</script>
+<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+{% endblock %}

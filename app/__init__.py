@@ -1,28 +1,52 @@
-import logging, os
-from flask import Flask, jsonify
+import logging
+import os
+
 from dotenv import load_dotenv
+from flask import Flask, jsonify
+
 from config import Config
 from .extensions import db, login_manager
 
+
 def create_app(test_config=None):
+    """Create and configure the NetPulse Flask application."""
     load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
-    if test_config: app.config.update(test_config)
+
+    # Tests provide a small replacement configuration, such as an in-memory database.
+    if test_config:
+        app.config.update(test_config)
+
     os.makedirs(app.instance_path, exist_ok=True)
-    db.init_app(app); login_manager.init_app(app)
+    db.init_app(app)
+    login_manager.init_app(app)
+
     from .models import User
+
     @login_manager.user_loader
-    def load_user(user_id): return db.session.get(User, int(user_id))
+    def load_user(user_id):
+        return db.session.get(User, int(user_id))
+
+    from .routes.alerts import bp as alerts_bp
     from .routes.auth import bp as auth_bp
     from .routes.dashboard import bp as dashboard_bp
     from .routes.devices import bp as devices_bp
-    from .routes.alerts import bp as alerts_bp
     from .routes.logs import bp as logs_bp
-    for blueprint in (auth_bp, dashboard_bp, devices_bp, alerts_bp, logs_bp): app.register_blueprint(blueprint)
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(dashboard_bp)
+    app.register_blueprint(devices_bp)
+    app.register_blueprint(alerts_bp)
+    app.register_blueprint(logs_bp)
+
     @app.errorhandler(404)
-    def not_found(_): return jsonify(error='Resource not found'), 404
+    def not_found(_error):
+        return jsonify(error="Resource not found"), 404
+
     @app.errorhandler(403)
-    def forbidden(_): return jsonify(error='Permission denied'), 403
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+    def forbidden(_error):
+        return jsonify(error="Permission denied"), 403
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     return app

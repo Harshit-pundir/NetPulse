@@ -3,7 +3,8 @@ from app.services.monitoring_service import should_start_monitoring, start_sched
 
 app = create_app()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     debug_mode = True
     if should_start_monitoring(app, debug_mode):
         start_scheduler(app)
