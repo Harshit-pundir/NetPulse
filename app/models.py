@@ -8,6 +8,8 @@ from .extensions import db
 class User(UserMixin, db.Model):
     """A person who can sign in to NetPulse."""
 
+    __tablename__ = "users"
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
@@ -17,6 +19,8 @@ class User(UserMixin, db.Model):
 
 class Device(db.Model):
     """A network device that NetPulse can monitor."""
+
+    __tablename__ = "devices"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True, nullable=False, index=True)
@@ -40,8 +44,13 @@ class Device(db.Model):
 class MonitoringResult(db.Model):
     """One reachability check for a device."""
 
+    __tablename__ = "monitoring_results"
+    __table_args__ = (
+        db.Index("ix_monitoring_results_device_checked_at", "device_id", "checked_at"),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey("device.id"), nullable=False, index=True)
+    device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=False, index=True)
     status = db.Column(db.String(16), nullable=False, index=True)
     latency = db.Column(db.Float)
     response_time = db.Column(db.Float)
@@ -52,8 +61,13 @@ class MonitoringResult(db.Model):
 class Alert(db.Model):
     """A device condition that may need a user's attention."""
 
+    __tablename__ = "alerts"
+    __table_args__ = (
+        db.Index("ix_alerts_device_created_at", "device_id", "created_at"),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey("device.id"), nullable=False, index=True)
+    device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=False, index=True)
     alert_type = db.Column(db.String(30), nullable=False, index=True)
     severity = db.Column(db.String(16), nullable=False, index=True)
     message = db.Column(db.String(500), nullable=False)
@@ -65,8 +79,13 @@ class Alert(db.Model):
 class ActivityLog(db.Model):
     """A simple audit trail for device and alert events."""
 
+    __tablename__ = "activity_logs"
+    __table_args__ = (
+        db.Index("ix_activity_logs_device_created_at", "device_id", "created_at"),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey("device.id"), nullable=True, index=True)
+    device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=True, index=True)
     event_type = db.Column(db.String(50), nullable=False, index=True)
     message = db.Column(db.String(500), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

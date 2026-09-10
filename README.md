@@ -1,92 +1,136 @@
 # NetPulse
 
-NetPulse is a lightweight Flask dashboard for monitoring network devices. It checks whether devices respond to `ping`, stores latency and status history, and shows alerts when a device goes down, recovers, or becomes slow.
+NetPulse is a lightweight network monitoring dashboard built with Python, Flask, SQLAlchemy, Supabase PostgreSQL, HTML, CSS, vanilla JavaScript, and Chart.js. It checks devices with `ping`, records latency and status history, and creates useful alerts.
 
-## Run the project
+## Architecture
+
+```text
+Browser
+   ↓
+HTML + CSS + Vanilla JavaScript
+   ↓
+Flask
+   ↓
+SQLAlchemy
+   ↓
+Supabase PostgreSQL
+```
+
+The browser communicates only with Flask. Supabase is the hosted PostgreSQL database; no database credentials or Supabase service keys are sent to the browser.
+
+Monitoring flow:
+
+```text
+Background Monitoring Worker
+   ↓
+Network Reachability Check
+   ↓
+Latency Measurement
+   ↓
+Device Status
+   ↓
+SQLAlchemy
+   ↓
+Supabase PostgreSQL
+   ↓
+Flask API
+   ↓
+Dashboard
+```
+
+## Supabase setup
+
+1. Create a project at [Supabase](https://supabase.com/).
+2. Open its database connection settings.
+3. Copy the PostgreSQL connection string in `psycopg` SQLAlchemy format.
+4. Copy `.env.example` to `.env`.
+5. Put the connection string in `DATABASE_URL`. Never commit `.env`.
+6. Run `python init_db.py`.
+7. Start Flask with `python run.py`.
+
+Example `.env` (placeholders only):
+
+```env
+SECRET_KEY=replace-with-a-long-random-value
+DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/DATABASE
+MONITOR_INTERVAL=10
+LATENCY_WARNING_MS=100
+LATENCY_CRITICAL_MS=200
+```
+
+Do not put Supabase API keys, service-role keys, passwords, or connection strings in source code, templates, JavaScript, or Git.
+
+## Run locally
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
+# Edit .env and add the Supabase PostgreSQL DATABASE_URL.
 python init_db.py
 python run.py
 ```
 
 Open `http://127.0.0.1:5000`.
 
+`init_db.py` can be run repeatedly. It creates missing tables and only adds missing starter users and demo devices.
+
 Development accounts:
 
 - Admin: `admin` / `admin123`
 - Viewer: `viewer` / `viewer123`
 
-Replace the seeded private-address devices with addresses reachable from the computer running NetPulse.
+## Import old SQLite data
 
-## Features
+The old local database is not deleted. If you want to keep its data, configure `.env` first, then run:
 
-- Login and logout with hashed passwords
-- Admin and viewer roles
-- Add, edit, delete, search, and paginate devices
-- Real ICMP reachability checks and latency measurement
-- Status history, uptime calculation, device details, logs, and charts
-- Device-down, recovery, and high-latency alerts
-- Duplicate alert prevention and alert acknowledgement
-- Dashboard auto-refresh with vanilla JavaScript
-
-## Simple architecture
-
-```text
-Browser
-   ↓
-Flask Routes
-   ↓
-Services
-   ↓
-SQLAlchemy Models
-   ↓
-SQLite / MySQL
+```powershell
+python import_sqlite.py instance/network_monitor.db
 ```
 
-Monitoring flow:
+The importer copies users, devices, monitoring results, alerts, and activity logs in foreign-key order. It skips primary keys already present in PostgreSQL, so rerunning it does not duplicate imported rows.
+
+## Database schema
+
+| Table | Purpose |
+| --- | --- |
+| `users` | Login username, password hash, role, and creation time. |
+| `devices` | Monitored devices and their current health. |
+| `monitoring_results` | One saved reachability and latency check. |
+| `alerts` | Device-down, recovery, and high-latency conditions. |
+| `activity_logs` | A simple audit trail of device and alert events. |
 
 ```text
-Scheduler
-   ↓
-Check Device
-   ↓
-Measure Latency
-   ↓
-Update Status
-   ↓
-Save Result
-   ↓
-Create Alert if Needed
+Device → MonitoringResult
+Device → Alert
+Device → ActivityLog
 ```
 
-## How the monitoring works
+All application timestamps are stored as UTC values. The dashboard converts them to the browser's local time for display.
 
-`run.py` starts one small background thread. Every `MONITOR_INTERVAL` seconds (10 by default), it finds enabled devices and calls `ping_host()` for each one. The service saves a `MonitoringResult`, updates the device's current status, and checks whether an alert is needed.
+## How monitoring works
 
-- No ping response means `OFFLINE`.
-- A response over `LATENCY_WARNING_MS` (100 ms by default) means `WARNING`.
-- Any other successful response means `ONLINE`.
-- A down alert is created only when a reachable device changes to offline, so repeating failed checks do not create duplicates.
-- When an offline device responds again, NetPulse creates a recovery alert and closes the active down alert.
+`run.py` starts one background thread. Every `MONITOR_INTERVAL` seconds it reads enabled devices from PostgreSQL, pings each device, saves a monitoring result, updates the latest device status, and applies alert rules.
 
-Uptime is easy to calculate: successful (`ONLINE` or `WARNING`) checks divided by all checks in the selected period, multiplied by 100.
+- No ping response: `OFFLINE`
+- Response over `LATENCY_WARNING_MS`: `WARNING`
+- Other response: `ONLINE`
+- Repeated failures do not duplicate a down alert.
+- An offline device that responds again receives a recovery alert.
 
-## How to understand the code
+Uptime is successful (`ONLINE` or `WARNING`) checks divided by all checks in the requested period, multiplied by 100.
 
-- `app/__init__.py` creates Flask and registers the routes.
-- `app/models.py` defines the database tables: users, devices, results, alerts, and logs.
-- `app/routes/` contains the web pages and JSON APIs. Routes validate input and return responses.
-- `app/services/monitoring_service.py` contains the step-by-step ping and scheduler logic.
-- `app/services/alert_service.py` contains the simple transition-based alert rules.
-- `app/services/uptime_service.py` contains the uptime formula.
-- `app/templates/` contains readable Jinja HTML pages.
-- `app/static/js/` fetches JSON APIs and updates the page. No frontend framework is used.
-- `app/static/css/style.css` contains the page styling grouped by section.
-- `tests/` contains readable arrange-act-assert tests. Network calls are mocked, so tests do not need Internet access.
+## Project guide
+
+- `config.py` reads safe configuration from environment variables.
+- `app/models.py` defines the PostgreSQL tables, indexes, and relationships.
+- `app/routes/` contains Flask pages and JSON APIs.
+- `app/services/monitoring_service.py` contains the ping worker.
+- `app/services/alert_service.py` contains transition-based alert rules.
+- `init_db.py` creates tables and starter data.
+- `import_sqlite.py` is the optional one-time legacy data importer.
+- `tests/` uses an isolated in-memory SQLite database and mocked network checks; production runtime uses Supabase PostgreSQL.
 
 ## APIs
 
@@ -98,8 +142,6 @@ Uptime is easy to calculate: successful (`ONLINE` or `WARNING`) checks divided b
 - Logs: `GET /api/logs`
 
 ## Tests
-
-Run:
 
 ```powershell
 pytest

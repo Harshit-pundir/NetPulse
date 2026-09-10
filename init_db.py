@@ -1,10 +1,11 @@
+import logging
+
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import generate_password_hash
 
 from app import create_app
 from app.extensions import db
 from app.models import Device, User
-
-app = create_app({"START_MONITORING": False})
 
 DEMO_DEVICES = [
     ("Local Router", "192.168.1.1", "ROUTER", "Network room"),
@@ -14,9 +15,9 @@ DEMO_DEVICES = [
     ("Access Point", "192.168.1.20", "ACCESS_POINT", "Floor 1"),
 ]
 
-with app.app_context():
-    db.create_all()
 
+def add_development_data():
+    """Add starter users and devices only when they do not already exist."""
     if not User.query.filter_by(username="admin").first():
         db.session.add(User(username="admin", password_hash=generate_password_hash("admin123"), role="ADMIN"))
     if not User.query.filter_by(username="viewer").first():
@@ -26,5 +27,22 @@ with app.app_context():
         if not Device.query.filter_by(name=name).first():
             db.session.add(Device(name=name, ip_address=ip_address, device_type=device_type, location=location))
 
-    db.session.commit()
-    print("Database ready. Admin: admin / admin123")
+
+def main():
+    try:
+        app = create_app({"START_MONITORING": False})
+        with app.app_context():
+            db.create_all()
+            add_development_data()
+            db.session.commit()
+    except (RuntimeError, SQLAlchemyError) as error:
+        logging.error("Could not initialize the database: %s", error)
+        print("Database setup failed. Check DATABASE_URL in .env and your Supabase connection.")
+        return 1
+
+    print("Supabase PostgreSQL database is ready. Admin: admin / admin123")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

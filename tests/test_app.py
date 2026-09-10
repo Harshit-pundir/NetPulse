@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from app.extensions import db
-from app.models import Alert, Device
+from app.models import ActivityLog, Alert, Device, MonitoringResult, User
 from app.services.monitoring_service import classify_latency, monitor_device, should_start_monitoring, start_scheduler
 from app.services.uptime_service import uptime_for
 from .conftest import login
@@ -57,6 +57,15 @@ def test_status_classification():
     assert classify_latency(None, 100, 200) == "OFFLINE"
     assert classify_latency(101, 100, 200) == "WARNING"
     assert classify_latency(10, 100, 200) == "ONLINE"
+
+
+def test_postgresql_table_names_and_indexes():
+    assert User.__tablename__ == "users"
+    assert Device.__tablename__ == "devices"
+    assert MonitoringResult.__tablename__ == "monitoring_results"
+    assert Alert.__tablename__ == "alerts"
+    assert ActivityLog.__tablename__ == "activity_logs"
+    assert "ix_monitoring_results_device_checked_at" in {index.name for index in MonitoringResult.__table__.indexes}
 
 
 def test_reloader_parent_does_not_start_monitoring(app, monkeypatch):

@@ -4,19 +4,32 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 
+# Load .env before Config reads DATABASE_URL from the environment.
+load_dotenv()
+
 from config import Config
 from .extensions import db, login_manager
 
 
 def create_app(test_config=None):
     """Create and configure the NetPulse Flask application."""
-    load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
 
     # Tests provide a small replacement configuration, such as an in-memory database.
     if test_config:
         app.config.update(test_config)
+
+    database_url = app.config.get("SQLALCHEMY_DATABASE_URI")
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is missing. Add your Supabase PostgreSQL URL to .env."
+        )
+    if not app.testing and not database_url.startswith("postgresql+psycopg://"):
+        raise RuntimeError(
+            "DATABASE_URL must use the PostgreSQL psycopg format: "
+            "postgresql+psycopg://..."
+        )
 
     os.makedirs(app.instance_path, exist_ok=True)
     db.init_app(app)

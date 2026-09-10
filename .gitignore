@@ -3,7 +3,9 @@
 venv/
 __pycache__/
 *.py[cod]
-instance/*.db
+*.db
+*.sqlite
+*.sqlite3
 .pytest_cache/
 .idea/
 .vscode/

@@ -1,18 +1,15 @@
 import os
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent
 
 
 class Config:
     """Settings read by Flask when the application starts."""
 
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-change-this-secret")
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        f"sqlite:///{BASE_DIR / 'instance' / 'network_monitor.db'}",
-    )
+    # Supabase provides this PostgreSQL URL. It is intentionally not hardcoded.
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # SQLAlchemy owns the connection pool. pre_ping replaces broken connections.
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "pool_recycle": 300}
     MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", "10"))
     LATENCY_WARNING_MS = float(os.getenv("LATENCY_WARNING_MS", "100"))
     LATENCY_CRITICAL_MS = float(os.getenv("LATENCY_CRITICAL_MS", "200"))
