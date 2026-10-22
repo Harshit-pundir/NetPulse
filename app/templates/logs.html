@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 
+{% block title %}Activity · NetPulse{% endblock %}
+
 {% block content %}
-<header><div><h2>Activity logs</h2><p>Device and alert events.</p></div></header>
-<article><div class="table-wrap"><table>
-    <thead><tr><th>Timestamp</th><th>Device</th><th>IP</th><th>Event</th><th>Message</th></tr></thead>
-    <tbody id="logs"></tbody>
-</table></div></article>
+<header class="page-header"><div><p class="eyebrow">AUDIT TRAIL</p><h1>Activity</h1><p class="page-subtitle">A chronological record of device health and configuration changes.</p></div></header>
+<section class="panel list-panel">
+    <div class="list-toolbar"><div><h2>Recent events</h2><p id="logCount" class="panel-note" aria-live="polite">Loading activity…</p></div>
+        <div class="filters"><label for="logDevice">Device<select id="logDevice"><option value="">All devices</option>{% for device in devices %}<option value="{{ device.id }}">{{ device.name }}</option>{% endfor %}</select></label><label for="logSearch">Search activity<input id="logSearch" type="search" placeholder="Find a message"></label></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th scope="col">Timestamp</th><th scope="col">Device</th><th scope="col">Address</th><th scope="col">Event</th><th scope="col">Details</th></tr></thead><tbody id="logs"><tr><td colspan="5" class="empty-state">Loading activity…</td></tr></tbody></table></div>
+    <div class="pagination"><span id="logPageLabel" aria-live="polite">Page 1</span><div><button class="button button-quiet" type="button" id="logPrevious" disabled>Previous</button><button class="button button-quiet" type="button" id="logNext" disabled>Next</button></div></div>
+</section>
 {% endblock %}
 
 {% block scripts %}<script src="{{ url_for('static', filename='js/logs.js') }}"></script>{% endblock %}

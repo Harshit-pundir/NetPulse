@@ -1,25 +1,26 @@
 {% extends "base.html" %}
 
+{% block title %}{{ device.name }} · NetPulse{% endblock %}
+
 {% block content %}
-<header>
-    <div>
-        <h2>{{ device.name }}</h2>
-        <p>{{ device.ip_address }} · {{ device.device_type }} · {{ device.location or "No location" }}</p>
-    </div>
-    <span class="badge {{ device.status }}">{{ device.status }}</span>
+<div class="detail-back"><a class="text-link" href="/devices"><span aria-hidden="true">←</span> Back to devices</a></div>
+<header class="page-header device-heading">
+    <div><p class="eyebrow">DEVICE DETAILS</p><h1>{{ device.name }}</h1><p class="page-subtitle"><span class="mono-text">{{ device.ip_address }}</span><span class="meta-divider">·</span>{{ device.device_type.replace('_', ' ')|title }}<span class="meta-divider">·</span>{{ device.location or "No location assigned" }}</p></div>
+    <span class="status-pill {{ device.status|lower }}"><i aria-hidden="true"></i>{{ device.status|replace('_', ' ')|title }}</span>
 </header>
 
-<section class="metrics">
-    <div><b>Latency</b><strong>{{ '%.1f'|format(device.current_latency) if device.current_latency is not none else '-' }} ms</strong></div>
-    <div><b>Monitoring</b><strong>{{ "Enabled" if device.monitoring_enabled else "Disabled" }}</strong></div>
-    <div><b>Last checked</b><strong>{{ device.last_checked_at or "Never" }}</strong></div>
+<section class="detail-metrics" aria-label="Device metrics">
+    <article class="detail-metric"><span class="detail-metric-icon latency-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13h4l3-8 4 14 3-8h4"/></svg></span><div><p>Current latency</p><strong>{{ '%.1f ms'|format(device.current_latency) if device.current_latency is not none else 'No measurement' }}</strong></div></article>
+    <article class="detail-metric"><span class="detail-metric-icon monitor-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></span><div><p>Monitoring</p><strong>{{ "Enabled" if device.monitoring_enabled else "Paused" }}</strong></div></article>
+    <article class="detail-metric"><span class="detail-metric-icon time-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span><div><p>Last successful check</p><strong>{{ device.last_checked_at.strftime('%b %d, %Y · %H:%M UTC') if device.last_checked_at else 'Not checked yet' }}</strong></div></article>
 </section>
 
-<article><h3>Latency history</h3><canvas id="historyChart"></canvas></article>
-<article><h3>Uptime</h3><div id="uptime">Loading...</div></article>
+<section class="panel history-panel">
+    <div class="panel-heading"><div><p class="eyebrow">RECORDED CHECKS</p><h2>Response time history</h2><p class="panel-note">Measured from the NetPulse host. Monitoring errors are not plotted as device failures.</p></div><label class="range-select" for="historyRange">Time range<select id="historyRange"><option value="24">Last 24 hours</option><option value="72">Last 3 days</option><option value="168">Last 7 days</option></select></label></div>
+    <div class="history-chart-wrap"><canvas id="historyChart" aria-label="Response time history for this device" role="img"></canvas><p id="historyEmpty" class="chart-empty">Loading monitoring history…</p></div>
+</section>
+
+<section class="panel uptime-panel"><div class="panel-heading"><div><p class="eyebrow">AVAILABILITY</p><h2>Observed uptime</h2><p class="panel-note">Successful checks divided by recorded device checks. Monitoring errors are excluded.</p></div></div><div id="uptime" class="uptime-grid" aria-live="polite"><p class="loading-state">Calculating from recorded checks…</p></div></section>
 {% endblock %}
 
-{% block scripts %}
-<script>const deviceId = {{ device.id }};</script>
-<script src="{{ url_for('static', filename='js/device-details.js') }}"></script>
-{% endblock %}
+{% block scripts %}<script>const deviceId = {{ device.id }};</script><script src="{{ url_for('static', filename='js/device-details.js') }}"></script>{% endblock %}

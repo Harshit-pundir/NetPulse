@@ -1,14 +1,16 @@
 {% extends "base.html" %}
 
+{% block title %}Alerts · NetPulse{% endblock %}
+
 {% block content %}
-<header><div><h2>Alerts</h2><p>Conditions requiring attention.</p></div></header>
-<article><div class="table-wrap"><table>
-    <thead><tr><th>Severity</th><th>Device</th><th>Type</th><th>Message</th><th>Time</th><th>Status</th></tr></thead>
-    <tbody id="alerts"></tbody>
-</table></div></article>
+<header class="page-header"><div><p class="eyebrow">EVENT CENTER</p><h1>Alerts</h1><p class="page-subtitle">Review device outages, recovery events, and latency conditions.</p></div></header>
+<section class="panel list-panel">
+    <div class="list-toolbar"><div><h2>Alert history</h2><p id="alertCount" class="panel-note" aria-live="polite">Loading alerts…</p></div>
+        <div class="filters"><label for="severity">Severity<select id="severity"><option value="">All severities</option><option>CRITICAL</option><option>WARNING</option><option>INFO</option></select></label><label for="alertStatus">Status<select id="alertStatus"><option value="false">Active</option><option value="true">Resolved</option><option value="">All alerts</option></select></label><label for="alertDevice">Device<select id="alertDevice"><option value="">All devices</option>{% for device in devices %}<option value="{{ device.id }}">{{ device.name }}</option>{% endfor %}</select></label></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th scope="col">Severity</th><th scope="col">Device</th><th scope="col">Type</th><th scope="col">Description</th><th scope="col">Time</th><th scope="col">State</th></tr></thead><tbody id="alerts"><tr><td colspan="6" class="empty-state">Loading alert history…</td></tr></tbody></table></div>
+    <div class="pagination"><span id="alertPageLabel" aria-live="polite">Page 1</span><div><button class="button button-quiet" type="button" id="alertPrevious" disabled>Previous</button><button class="button button-quiet" type="button" id="alertNext" disabled>Next</button></div></div>
+</section>
 {% endblock %}
 
-{% block scripts %}
-<script>const admin = {{ 'true' if current_user.role == 'ADMIN' else 'false' }};</script>
-<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
-{% endblock %}
+{% block scripts %}<script>const admin = {{ 'true' if current_user.role == 'ADMIN' else 'false' }};</script><script src="{{ url_for('static', filename='js/alerts.js') }}"></script>{% endblock %}

@@ -1,37 +1,45 @@
 {% extends "base.html" %}
 
+{% block title %}Overview · NetPulse{% endblock %}
+
 {% block content %}
-<header>
-    <div>
-        <h2>Network overview</h2>
-        <p>Live health signals from this NetPulse instance.</p>
-    </div>
-    <span id="updated"></span>
+<header class="page-header dashboard-heading">
+    <div><p class="eyebrow">LIVE MONITORING</p><h1>Network overview</h1><p class="page-subtitle">A clear view of device health and recent performance.</p></div>
+    <div class="header-actions"><span id="updated" class="updated-state" aria-live="polite">Connecting to NetPulse…</span><a class="button button-secondary" href="/devices">Manage devices <span aria-hidden="true">→</span></a></div>
 </header>
 
-<section class="metrics" id="metrics"></section>
+<section class="metrics" id="metrics" aria-label="Network metrics" aria-live="polite"><p class="loading-state">Loading current network metrics…</p></section>
 
-<section class="grid">
-    <article><h3>Device status</h3><canvas id="statusChart"></canvas></article>
-    <article><h3>Recent latency</h3><canvas id="latencyChart"></canvas></article>
+<section class="dashboard-charts" aria-label="Network health charts">
+    <article class="panel status-panel">
+        <div class="panel-heading"><div><p class="eyebrow">HEALTH SNAPSHOT</p><h2>Device status</h2></div><a class="text-link" href="/devices">All devices <span aria-hidden="true">→</span></a></div>
+        <div class="status-chart-wrap"><canvas id="statusChart" aria-label="Chart showing device status distribution" role="img"></canvas><p id="statusEmpty" class="chart-empty">Loading status…</p></div>
+        <div class="status-legend" id="statusLegend" aria-live="polite"></div>
+    </article>
+    <article class="panel latency-panel">
+        <div class="panel-heading"><div><p class="eyebrow">PERFORMANCE</p><h2>Response time</h2><p class="panel-note">Recorded checks · last 24 hours</p></div><span class="chart-unit">milliseconds</span></div>
+        <div class="latency-chart-wrap"><canvas id="latencyChart" aria-label="Recorded network response times over the last 24 hours" role="img"></canvas><p id="latencyEmpty" class="chart-empty">Loading monitoring history…</p></div>
+    </article>
 </section>
 
-<section class="grid">
-    <article><h3>Recent alerts</h3><div id="alerts"></div></article>
-    <article><h3>Recent activity</h3><div id="activity"></div></article>
+<section class="dashboard-lower">
+    <article class="panel feed-panel">
+        <div class="panel-heading"><div><p class="eyebrow">NEEDS ATTENTION</p><h2>Recent alerts</h2></div><a class="text-link" href="/alerts">View alerts <span aria-hidden="true">→</span></a></div>
+        <div id="alerts" class="feed-content" aria-live="polite"><p class="loading-state">Loading alerts…</p></div>
+    </article>
+    <article class="panel feed-panel">
+        <div class="panel-heading"><div><p class="eyebrow">WHAT CHANGED</p><h2>Recent activity</h2></div><a class="text-link" href="/logs">Open activity <span aria-hidden="true">→</span></a></div>
+        <div id="activity" class="feed-content" aria-live="polite"><p class="loading-state">Loading activity…</p></div>
+    </article>
 </section>
 
-<article>
-    <h3>Device health</h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Device</th><th>Address</th><th>Type</th><th>Status</th><th>Latency</th><th>Last checked</th></tr></thead>
-            <tbody id="health"></tbody>
-        </table>
-    </div>
+<article class="panel device-health-panel">
+    <div class="panel-heading"><div><p class="eyebrow">INVENTORY</p><h2>Device health</h2><p class="panel-note">Latest recorded state for each monitored device.</p></div><a class="button button-secondary" href="/devices">Device inventory <span aria-hidden="true">→</span></a></div>
+    <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Device</th><th scope="col">Address</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Latency</th><th scope="col">Last checked</th></tr></thead>
+        <tbody id="health"><tr><td colspan="6" class="empty-state">Loading devices…</td></tr></tbody>
+    </table></div>
 </article>
 {% endblock %}
 
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>{% endblock %}

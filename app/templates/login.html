@@ -3,14 +3,22 @@
 {% block title %}Sign in · NetPulse{% endblock %}
 
 {% block content %}
-<section class="login">
-    <h1>Net<span>Pulse</span></h1>
-    <p>Network health, in focus.</p>
-    <form method="post">
-        <label>Username<input name="username" required autofocus></label>
-        <label>Password<input type="password" name="password" required></label>
-        <button type="submit">Sign in</button>
-    </form>
-    <small>Development: admin / admin123</small>
+<section class="login-layout">
+    <div class="login-story">
+        <a class="brand login-brand" href="/login"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 23V9l18 14V9" /></svg></span><span class="brand-name">Net<span>Pulse</span></span></a>
+        <div class="login-story-copy"><p class="eyebrow">NETWORK OPERATIONS</p><h1>See the signal.<br><span>Stay ahead.</span></h1><p>One focused workspace for device health, latency, and the events that matter.</p></div>
+        <div class="login-story-footer"><span class="story-line" aria-hidden="true"></span><span>Private monitoring · Your network, in view</span></div>
+        <div class="login-orbit orbit-one" aria-hidden="true"></div><div class="login-orbit orbit-two" aria-hidden="true"></div>
+    </div>
+    <div class="login-side"><section class="login-card" aria-labelledby="loginTitle">
+        <p class="eyebrow">WELCOME BACK</p><h2 id="loginTitle">Sign in to NetPulse</h2><p class="login-intro">Use your account to continue to the monitoring console.</p>
+        <form method="post" class="login-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label for="username">Username<input id="username" name="username" autocomplete="username" placeholder="Enter your username" required autofocus></label>
+            <label for="password">Password<input id="password" type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required></label>
+            <button type="submit" class="button button-primary">Sign in <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="login-footnote"><span class="lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>Protected access for your monitoring workspace</p>
+    </section><p class="login-copyright">NetPulse <span>·</span> Network Monitoring &amp; Health Dashboard</p></div>
 </section>
 {% endblock %}
