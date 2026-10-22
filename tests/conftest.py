@@ -27,7 +27,18 @@ def client(app):
 
 
 def login(client, username="admin"):
-    return client.post("/login", data={"username": username, "password": "pass"}, follow_redirects=True)
+    client.get("/login")
+    token = csrf_token(client)
+    return client.post("/login", data={"username": username, "password": "pass", "csrf_token": token}, follow_redirects=True)
+
+
+def csrf_token(client):
+    with client.session_transaction() as session:
+        return session.get("csrf_token", "")
+
+
+def csrf_headers(client):
+    return {"X-CSRF-Token": csrf_token(client)}
 
 
 @pytest.fixture

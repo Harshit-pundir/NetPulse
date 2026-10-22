@@ -7,7 +7,8 @@ def uptime_for(device_id, hours):
     """Return the percentage of successful checks in the selected time window."""
     start_time = datetime.utcnow() - timedelta(hours=hours)
     results = MonitoringResult.query.filter_by(device_id=device_id).filter(
-        MonitoringResult.checked_at >= start_time
+        MonitoringResult.checked_at >= start_time,
+        MonitoringResult.status != "MONITOR_ERROR",
     ).all()
 
     total_checks = len(results)
@@ -16,7 +17,7 @@ def uptime_for(device_id, hours):
 
     online_checks = 0
     for result in results:
-        if result.status in ("ONLINE", "WARNING"):
+        if result.status in ("ONLINE", "WARNING", "CRITICAL"):
             online_checks += 1
 
     # A warning is still a successful reachability check.

@@ -19,7 +19,7 @@ def index():
 @login_required
 def summary():
     devices = Device.query.all()
-    status_counts = {"ONLINE": 0, "OFFLINE": 0, "WARNING": 0, "UNKNOWN": 0}
+    status_counts = {"ONLINE": 0, "OFFLINE": 0, "WARNING": 0, "CRITICAL": 0, "UNKNOWN": 0}
     latency_values = []
 
     for device in devices:
@@ -36,6 +36,7 @@ def summary():
         online=status_counts["ONLINE"],
         offline=status_counts["OFFLINE"],
         warning=status_counts["WARNING"],
+        critical=status_counts["CRITICAL"],
         unknown=status_counts["UNKNOWN"],
         active_alerts=Alert.query.filter_by(acknowledged=False).count(),
         average_latency=average_latency,

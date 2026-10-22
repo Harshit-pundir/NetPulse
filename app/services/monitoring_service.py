@@ -14,14 +14,16 @@ from ..models import ActivityLog, Device, MonitoringResult
 from .alert_service import process_transition
 
 log = logging.getLogger(__name__)
+_scheduler_lock = threading.Lock()
+_shutdown_timeout = 5
 
 
-def should_start_monitoring(app, debug_mode):
+def should_start_monitoring(app, use_reloader):
     """Avoid starting a second worker in Flask's debug reloader parent process."""
     if not app.config.get("START_MONITORING", True) or app.testing:
         return False
 
-    if not debug_mode:
+    if not use_reloader:
         return True
 
     return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
@@ -39,7 +41,7 @@ def ping_host(host, timeout=2):
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=timeout + 2)
     except (subprocess.TimeoutExpired, OSError) as error:
-        return False, None, str(error)
+        return False, None, f"MONITOR_ERROR: {error}"
 
     output = (result.stdout or "") + (result.stderr or "")
     if result.returncode != 0:
@@ -55,10 +57,12 @@ def ping_host(host, timeout=2):
     return True, latency, None
 
 
-def classify_latency(latency, warning_threshold, _critical_threshold):
+def classify_latency(latency, warning_threshold, critical_threshold):
     """Convert a ping result into the status displayed in the dashboard."""
     if latency is None:
         return "OFFLINE"
+    if latency > critical_threshold:
+        return "CRITICAL"
     if latency > warning_threshold:
         return "WARNING"
     return "ONLINE"
@@ -86,6 +90,18 @@ def monitor_device(device):
     old_status = device.status
     reachable, latency, error_message = ping_host(device.ip_address)
 
+    # A local execution error says nothing about the device's health.
+    if error_message and error_message.startswith("MONITOR_ERROR:"):
+        checked_at = datetime.utcnow()
+        db.session.add(MonitoringResult(
+            device_id=device.id,
+            status="MONITOR_ERROR",
+            checked_at=checked_at,
+            error_message=error_message.removeprefix("MONITOR_ERROR: ")[:500],
+        ))
+        db.session.commit()
+        return "MONITOR_ERROR"
+
     if not reachable:
         latency = None
 
@@ -106,11 +122,17 @@ def monitor_device(device):
     return status
 
 
-def monitor_all_devices():
+def monitor_all_devices(stop_event=None):
     """Run one monitoring cycle for every enabled device."""
     devices = Device.query.filter_by(monitoring_enabled=True).all()
     for device in devices:
         try:
+            if stop_event:
+                # Reserve the next check atomically with shutdown. Once shutdown
+                # sets the event, no further device check can be reserved.
+                with _scheduler_lock:
+                    if stop_event.is_set():
+                        break
             monitor_device(device)
         except Exception:
             # A failed device check must not stop checks for remaining devices.
@@ -120,19 +142,60 @@ def monitor_all_devices():
 
 def start_scheduler(app):
     """Start one background thread that repeatedly checks all devices."""
-    if app.extensions.get("netpulse_monitoring_worker_started"):
-        return False
+    with _scheduler_lock:
+        if app.extensions.get("netpulse_monitoring_worker_started"):
+            return False
 
-    app.extensions["netpulse_monitoring_worker_started"] = True
+        stop_event = threading.Event()
+        app.extensions["netpulse_monitoring_stop_event"] = stop_event
 
-    def worker():
-        # Database queries need Flask's application context outside a web request.
-        with app.app_context():
-            while True:
-                monitor_all_devices()
-                time.sleep(app.config["MONITOR_INTERVAL"])
+        def worker():
+            # Database queries need Flask's application context outside a web request.
+            with app.app_context():
+                while not stop_event.is_set():
+                    try:
+                        monitor_all_devices(stop_event)
+                    except Exception:
+                        # A database outage must not permanently kill the worker thread.
+                        db.session.rollback()
+                        log.exception("Monitoring cycle failed; it will retry")
+                    finally:
+                        db.session.remove()
+                    stop_event.wait(max(1, app.config["MONITOR_INTERVAL"]))
 
-    thread = threading.Thread(target=worker, daemon=True, name="netpulse-monitor")
-    thread.start()
+        thread = threading.Thread(target=worker, daemon=True, name="netpulse-monitor")
+        app.extensions["netpulse_monitoring_thread"] = thread
+        app.extensions["netpulse_monitoring_worker_started"] = True
+        try:
+            thread.start()
+        except Exception:
+            app.extensions["netpulse_monitoring_worker_started"] = False
+            app.extensions.pop("netpulse_monitoring_thread", None)
+            app.extensions.pop("netpulse_monitoring_stop_event", None)
+            raise
     log.info("Monitoring worker started")
     return True
+
+
+def stop_scheduler(app, timeout=5):
+    """Signal the worker to stop and wait for at most five seconds."""
+    with _scheduler_lock:
+        stop_event = app.extensions.get("netpulse_monitoring_stop_event")
+        thread = app.extensions.get("netpulse_monitoring_thread")
+        if not stop_event or not thread:
+            return False
+        stop_event.set()
+
+    if thread is threading.current_thread():
+        return False
+    try:
+        thread.join(min(max(0, timeout), _shutdown_timeout))
+    except KeyboardInterrupt:
+        # A second Ctrl+C should not cancel the stop signal or cause another
+        # shutdown traceback. The daemon worker will finish its current check.
+        log.warning("Shutdown wait interrupted; monitoring has been told to stop")
+        return False
+
+    if not thread.is_alive():
+        return True
+    return False

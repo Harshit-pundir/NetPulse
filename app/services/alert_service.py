@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from ..extensions import db
 from ..models import ActivityLog, Alert
 
@@ -6,6 +8,9 @@ def create_alert(device, alert_type, severity, message):
     """Create one active alert of a type, unless it already exists."""
     active_alert = Alert.query.filter_by(device_id=device.id, alert_type=alert_type, acknowledged=False).first()
     if active_alert:
+        if severity == "CRITICAL":
+            active_alert.severity = severity
+            active_alert.message = message
         return active_alert
 
     alert = Alert(device_id=device.id, alert_type=alert_type, severity=severity, message=message)
@@ -19,12 +24,18 @@ def acknowledge_active_alerts(device_id, alert_type):
     alerts = Alert.query.filter_by(device_id=device_id, alert_type=alert_type, acknowledged=False).all()
     for alert in alerts:
         alert.acknowledged = True
+        alert.acknowledged_at = datetime.utcnow()
+        db.session.add(ActivityLog(
+            device_id=device_id,
+            event_type="ALERT_RESOLVED",
+            message=f"Alert resolved: {alert.message}",
+        ))
 
 
 def process_transition(device, old_status, new_status, latency):
     """Create alerts only when a device changes health state."""
-    was_reachable = old_status in ("ONLINE", "WARNING")
-    is_reachable = new_status in ("ONLINE", "WARNING")
+    was_reachable = old_status in ("ONLINE", "WARNING", "CRITICAL")
+    is_reachable = new_status in ("ONLINE", "WARNING", "CRITICAL")
 
     if was_reachable and new_status == "OFFLINE":
         create_alert(device, "DEVICE_DOWN", "CRITICAL", f"{device.name} is unreachable.")
@@ -33,8 +44,13 @@ def process_transition(device, old_status, new_status, latency):
         create_alert(device, "DEVICE_RECOVERED", "INFO", f"{device.name} has recovered.")
         acknowledge_active_alerts(device.id, "DEVICE_DOWN")
 
-    if new_status == "WARNING" and old_status != "WARNING":
-        create_alert(device, "HIGH_LATENCY", "WARNING", f"{device.name} latency is {latency:.1f} ms.")
+    entering_latency_alert = (
+        new_status in ("WARNING", "CRITICAL") and old_status not in ("WARNING", "CRITICAL")
+    )
+    escalating_latency_alert = new_status == "CRITICAL" and old_status == "WARNING"
+    if entering_latency_alert or escalating_latency_alert:
+        severity = "CRITICAL" if new_status == "CRITICAL" else "WARNING"
+        create_alert(device, "HIGH_LATENCY", severity, f"{device.name} latency is {latency:.1f} ms.")
 
-    if new_status != "WARNING":
+    if new_status not in ("WARNING", "CRITICAL"):
         acknowledge_active_alerts(device.id, "HIGH_LATENCY")

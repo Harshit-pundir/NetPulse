@@ -1,4 +1,5 @@
 import ipaddress
+import re
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, render_template, request
@@ -16,31 +17,46 @@ DEVICE_TYPES = {"ROUTER", "SWITCH", "SERVER", "PC", "ACCESS_POINT", "OTHER"}
 
 def valid_target(value):
     """Accept either an IP address or a simple hostname."""
+    if not isinstance(value, str) or not value or len(value) > 253:
+        return False
     try:
         ipaddress.ip_address(value)
         return True
     except ValueError:
-        return bool(value and all(character.isalnum() or character in ".-" for character in value))
+        return all(
+            len(label) <= 63 and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label)
+            for label in value.rstrip(".").split(".")
+        )
 
 
 def payload_error(data):
-    if not data.get("name", "").strip():
+    name = data.get("name")
+    if not isinstance(name, str) or not name.strip():
         return "Name is required."
-    if not valid_target(data.get("ip_address", "").strip()):
+    if len(name.strip()) > 120:
+        return "Name must be 120 characters or fewer."
+    address = data.get("ip_address")
+    if not isinstance(address, str) or not valid_target(address.strip()):
         return "A valid IP address or hostname is required."
-    if data.get("device_type") not in DEVICE_TYPES:
+    if not isinstance(data.get("device_type"), str) or data.get("device_type") not in DEVICE_TYPES:
         return "A valid device type is required."
     return None
 
 
 def clean_device_fields(data):
+    def optional_text(field, limit):
+        value = data.get(field, "")
+        if not isinstance(value, str):
+            return None
+        return value.strip()[:limit] or None
+
     return {
         "name": data["name"].strip(),
         "ip_address": data["ip_address"].strip(),
-        "hostname": data.get("hostname", "").strip() or None,
+        "hostname": optional_text("hostname", 255),
         "device_type": data["device_type"],
-        "location": data.get("location", "").strip() or None,
-        "description": data.get("description", "").strip() or None,
+        "location": optional_text("location", 120),
+        "description": optional_text("description", 2000),
     }
 
 

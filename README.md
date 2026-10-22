@@ -53,6 +53,7 @@ Example `.env` (placeholders only):
 ```env
 SECRET_KEY=replace-with-a-long-random-value
 DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/DATABASE
+INITIAL_ADMIN_PASSWORD=choose-a-unique-password-at-least-12-chars
 MONITOR_INTERVAL=10
 LATENCY_WARNING_MS=100
 LATENCY_CRITICAL_MS=200
@@ -67,7 +68,7 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
-# Edit .env and add the Supabase PostgreSQL DATABASE_URL.
+# Edit .env and set SECRET_KEY, DATABASE_URL, and INITIAL_ADMIN_PASSWORD.
 python init_db.py
 python run.py
 ```
@@ -76,10 +77,9 @@ Open `http://127.0.0.1:5000`.
 
 `init_db.py` can be run repeatedly. It creates missing tables and only adds missing starter users and demo devices.
 
-Development accounts:
-
-- Admin: `admin` / `admin123`
-- Viewer: `viewer` / `viewer123`
+On a new database, `init_db.py` creates the `admin` account using
+`INITIAL_ADMIN_PASSWORD`. Existing users are kept, and no sample devices or
+default accounts are inserted. Add real devices from the Devices page.
 
 ## Import old SQLite data
 
