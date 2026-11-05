@@ -1,48 +1,59 @@
 # NetPulse
 
-NetPulse checks network devices, records latency and availability in Supabase PostgreSQL, and displays results in the existing HTML dashboard.
+NetPulse checks configured network devices and shows their current status, check history, alerts, and activity in a server-rendered dashboard.
 
-## Stack and structure
+## Technology
 
-- FastAPI serves the pages and JSON APIs; `/docs` and `/redoc` show interactive API documentation.
-- SQLAlchemy maps the existing `users`, `devices`, `monitoring_results`, `alerts`, and `activity_logs` tables.
-- Jinja2 renders the original pages. Existing CSS and vanilla JavaScript remain in `app/static`.
-- `app/main.py` contains the routes and application setup; `app/database.py` creates database sessions; `app/models.py` describes database rows; `app/schemas.py` validates device input; `app/services` contains monitoring and alert rules.
+- FastAPI handles pages and JSON APIs.
+- The official `supabase` Python package provides one shared client for the existing Supabase PostgreSQL project.
+- Pydantic validates API input. Jinja2, HTML, CSS, and vanilla JavaScript provide the existing browser interface.
+- A small Python background thread checks devices with the operating system's `ping` command.
 
-## Setup
+The application keeps using the existing `users`, `devices`, `monitoring_results`, `alerts`, and `activity_logs` tables. Startup reads from the API to check connectivity; it does not create or reset tables.
 
-Use Python 3.11 or newer. Create `.env` from `.env.example` and enter the existing Supabase PostgreSQL URL and a long random secret. Keep `.env` private.
+## Project guide
+
+- `app/main.py` contains FastAPI setup, browser pages, and API routes.
+- `app/database.py` reads `SUPABASE_URL` and `SUPABASE_KEY` and creates the one shared `supabase` client.
+- `app/schemas.py` checks incoming device and registration fields.
+- `app/services/monitoring_service.py` runs the background device checks.
+- `app/services/alert_service.py` applies status-change alert rules.
+- `app/services/uptime_service.py` calculates uptime from saved check results.
+- `init_db.py` can add the initial administrator row to the existing `users` table; it does not create tables.
+- `app/templates/` contains Jinja2 pages. `app/static/` contains the existing CSS and JavaScript.
+
+## Configure Supabase
+
+For a fresh checkout only, copy `.env.example` to `.env`. In an existing checkout, keep the current `.env` and add `SUPABASE_URL` and `SUPABASE_KEY` from the existing Supabase project; also keep a long random `SECRET_KEY`. Never put the Supabase key in JavaScript, templates, logs, or Git. Keep `.env` private.
+
+The key must have Data API access to the existing tables. If Row Level Security is enabled, configure policies for the chosen key. The app does not use Supabase Auth; it checks the existing `users.password_hash` values and keeps a signed browser session.
+
+Settings include `MONITOR_INTERVAL` (seconds), `LATENCY_WARNING_MS`, `LATENCY_CRITICAL_MS`, `START_MONITORING`, and `COOKIE_SECURE` (set true behind HTTPS).
+
+## Install and run
 
 ```powershell
-py -3.11 -m venv .venv
+py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env
-# Edit .env and set DATABASE_URL, SECRET_KEY, and INITIAL_ADMIN_PASSWORD.
+# For a fresh checkout only: Copy-Item .env.example .env
+# In an existing checkout, add required values to .env without replacing it.
 python init_db.py
 python run.py
 ```
 
-Open http://127.0.0.1:8000. The app checks database connectivity at startup and does not create, drop, or rebuild tables. Keep the existing Supabase schema and connection string in `.env`.
+Open http://127.0.0.1:8000. FastAPI docs are at http://127.0.0.1:8000/docs and http://127.0.0.1:8000/redoc.
 
-`.env` settings: `DATABASE_URL`, `SECRET_KEY`, `INITIAL_ADMIN_PASSWORD`, `MONITOR_INTERVAL` (seconds), `LATENCY_WARNING_MS`, `LATENCY_CRITICAL_MS`, `START_MONITORING`, and optionally `COOKIE_SECURE=true` behind HTTPS.
+## Request and monitoring flow
 
-## API and workflow
+The browser sends requests to FastAPI. Routes check the cookie session and CSRF token, validate input with Pydantic, then use the shared `supabase` client for table reads or writes. FastAPI returns rendered HTML or JSON for the existing JavaScript.
 
-The browser sends same-origin fetch requests to the FastAPI JSON routes. FastAPI checks the signed session cookie, validates input with Pydantic, and uses a short-lived SQLAlchemy session to read or write PostgreSQL. Server-rendered pages use the same Jinja templates as before.
-
-Important APIs include `/api/dashboard/summary`, `/api/dashboard/activity`, `/api/devices`, `/api/alerts`, and `/api/logs`. Device create, update, delete, acknowledgement, and monitoring controls require an administrator. All state-changing browser requests include the CSRF token rendered into the page.
-
-FastAPI documentation: http://127.0.0.1:8000/docs and http://127.0.0.1:8000/redoc.
-
-## Monitoring
-
-At startup, one background thread periodically reads enabled device IDs, pings each device, and saves a result using a separate SQLAlchemy session per check. A failure for one device is logged and does not prevent other checks. Alert rules run on status transitions, so repeated failures do not create repeated active alerts. On shutdown the app signals the thread and waits up to five seconds.
-
-Ping may be blocked by a firewall or network policy. Latency is measured from the computer running NetPulse.
+At startup the app checks that the `devices` table can be read. One background thread then loads enabled devices, pings them, and writes each check through the same Supabase client. Status transitions create down, recovery, or high-latency alerts. A failed device check does not stop checks for other devices. Shutdown signals the thread and waits up to five seconds.
 
 ## Tests
 
 ```powershell
 pytest
 ```
+
+Tests use a fake in-memory Supabase client, so they do not need production credentials and never write to your project. A live connection check requires valid `SUPABASE_URL` and `SUPABASE_KEY` values in `.env`.

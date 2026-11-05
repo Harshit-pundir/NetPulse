@@ -12,7 +12,10 @@ class DeviceInput(BaseModel):
     @field_validator("name", "ip_address")
     @classmethod
     def strip_values(cls, value):
-        return value.strip()
+        value = value.strip()
+        if not value:
+            raise ValueError("This field cannot be empty")
+        return value
 
 
 class MonitoringInput(BaseModel):

@@ -1,1 +1,1 @@
-"""Configuration values are read from environment variables by app/main.py."""
+"""Application settings are read from .env by app.main and app.database."""

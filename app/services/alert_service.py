@@ -1,33 +1,55 @@
-from datetime import datetime
-from sqlalchemy import select
-from ..models import ActivityLog, Alert
+"""Create, update, and resolve alerts through the shared Supabase client."""
+from datetime import datetime, timezone
+from app.database import supabase
 
 
-def create_alert(session, device, alert_type, severity, message):
-    active = session.scalar(select(Alert).where(Alert.device_id == device.id, Alert.alert_type == alert_type, Alert.acknowledged.is_(False)))
+def _add_activity(device_id: int, event_type: str, message: str) -> None:
+    supabase.table("activity_logs").insert({
+        "device_id": device_id, "event_type": event_type, "message": message,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }).execute()
+
+
+def create_alert(device: dict, alert_type: str, severity: str, message: str) -> dict:
+    active = (supabase.table("alerts").select("*").eq("device_id", device["id"])
+              .eq("alert_type", alert_type).eq("acknowledged", False).limit(1).execute().data or [])
     if active:
-        if severity == "CRITICAL": active.severity, active.message = severity, message
-        return active
-    alert = Alert(device_id=device.id, alert_type=alert_type, severity=severity, message=message)
-    session.add_all([alert, ActivityLog(device_id=device.id, event_type=alert_type, message=message)])
-    return alert
+        alert = active[0]
+        if severity == "CRITICAL":
+            supabase.table("alerts").update({"severity": severity, "message": message}).eq("id", alert["id"]).execute()
+        return alert
+
+    result = supabase.table("alerts").insert({
+        "device_id": device["id"], "alert_type": alert_type,
+        "severity": severity, "message": message, "acknowledged": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }).execute()
+    _add_activity(device["id"], alert_type, message)
+    return result.data[0]
 
 
-def acknowledge_active_alerts(session, device_id, alert_type):
-    rows = session.scalars(select(Alert).where(Alert.device_id == device_id, Alert.alert_type == alert_type, Alert.acknowledged.is_(False))).all()
-    for alert in rows:
-        alert.acknowledged, alert.acknowledged_at = True, datetime.utcnow()
-        session.add(ActivityLog(device_id=device_id, event_type="ALERT_RESOLVED", message=f"Alert resolved: {alert.message}"))
+def acknowledge_active_alerts(device_id: int, alert_type: str) -> None:
+    alerts = (supabase.table("alerts").select("*").eq("device_id", device_id)
+              .eq("alert_type", alert_type).eq("acknowledged", False).execute().data or [])
+    now = datetime.now(timezone.utc).isoformat()
+    for alert in alerts:
+        supabase.table("alerts").update({"acknowledged": True, "acknowledged_at": now}).eq("id", alert["id"]).execute()
+        _add_activity(device_id, "ALERT_RESOLVED", f"Alert resolved: {alert['message']}")
 
 
-def process_transition(session, device, old_status, new_status, latency):
-    was_up = old_status in ("ONLINE", "WARNING", "CRITICAL")
-    is_up = new_status in ("ONLINE", "WARNING", "CRITICAL")
-    if was_up and new_status == "OFFLINE": create_alert(session, device, "DEVICE_DOWN", "CRITICAL", f"{device.name} is unreachable.")
+def process_transition(device: dict, old_status: str, new_status: str, latency: float) -> None:
+    was_up = old_status in {"ONLINE", "WARNING", "CRITICAL"}
+    is_up = new_status in {"ONLINE", "WARNING", "CRITICAL"}
+    if was_up and new_status == "OFFLINE":
+        create_alert(device, "DEVICE_DOWN", "CRITICAL", f"{device['name']} is unreachable.")
     if old_status == "OFFLINE" and is_up:
-        create_alert(session, device, "DEVICE_RECOVERED", "INFO", f"{device.name} has recovered.")
-        acknowledge_active_alerts(session, device.id, "DEVICE_DOWN")
-    if new_status in ("WARNING", "CRITICAL") and old_status not in ("WARNING", "CRITICAL") or new_status == "CRITICAL" and old_status == "WARNING":
+        create_alert(device, "DEVICE_RECOVERED", "INFO", f"{device['name']} has recovered.")
+        acknowledge_active_alerts(device["id"], "DEVICE_DOWN")
+
+    entered_slow_state = new_status in {"WARNING", "CRITICAL"} and old_status not in {"WARNING", "CRITICAL"}
+    escalated = new_status == "CRITICAL" and old_status == "WARNING"
+    if entered_slow_state or escalated:
         severity = "CRITICAL" if new_status == "CRITICAL" else "WARNING"
-        create_alert(session, device, "HIGH_LATENCY", severity, f"{device.name} latency is {latency:.1f} ms.")
-    if new_status not in ("WARNING", "CRITICAL"): acknowledge_active_alerts(session, device.id, "HIGH_LATENCY")
+        create_alert(device, "HIGH_LATENCY", severity, f"{device['name']} latency is {latency:.1f} ms.")
+    if new_status not in {"WARNING", "CRITICAL"}:
+        acknowledge_active_alerts(device["id"], "HIGH_LATENCY")

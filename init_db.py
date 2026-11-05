@@ -1,25 +1,28 @@
-"""Check the existing database and add the first admin account if needed."""
+"""Add an initial administrator to the existing Supabase users table if needed."""
 import os
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv()
-from sqlalchemy import text
-from app.database import SessionLocal, engine
-from app.models import User
 from werkzeug.security import generate_password_hash
+from app.database import supabase
 
 
 def main():
-    # Do not create, drop, or rebuild tables; this project uses the existing schema.
-    with engine.connect() as connection:
-        connection.execute(text("SELECT 1"))
-    with SessionLocal() as session:
-        if not session.query(User).filter_by(username="admin").first():
-            password = os.getenv("INITIAL_ADMIN_PASSWORD", "")
-            if len(password) < 12:
-                raise RuntimeError("Set INITIAL_ADMIN_PASSWORD to at least 12 characters before initializing a new database.")
-            session.add(User(username="admin", password_hash=generate_password_hash(password), role="ADMIN"))
-            session.commit()
-    print("Database is ready. Sign in as admin with INITIAL_ADMIN_PASSWORD.")
+    """Keep existing accounts; only add the admin when the table has no admin."""
+    admins = supabase.table("users").select("id").eq("username", "admin").limit(1).execute().data or []
+    if admins:
+        print("An admin account already exists; no database changes were made.")
+        return 0
+    password = os.getenv("INITIAL_ADMIN_PASSWORD", "")
+    if len(password) < 12:
+        raise RuntimeError("Set INITIAL_ADMIN_PASSWORD to at least 12 characters before creating the first admin.")
+    supabase.table("users").insert({
+        "username": "admin", "password_hash": generate_password_hash(password), "role": "ADMIN",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }).execute()
+    print("Initial admin account added to the existing Supabase users table.")
+    return 0
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    raise SystemExit(main())
