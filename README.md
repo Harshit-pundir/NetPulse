@@ -1,25 +1,21 @@
-::: {align="center"}
+<div align="center">
+
 # 🌐 NetPulse
 
-### *Monitor. Analyze. Stay Connected.*
+### Monitor. Analyze. Stay Connected.
 
-A **Network Monitoring & Health Dashboard** that helps monitor
-registered devices, track network health, view monitoring results,
-manage alerts, and review activity through a centralized dashboard.
+A Network Monitoring & Health Dashboard that helps monitor registered devices, track network health, view monitoring results, manage alerts, and review activity through a centralized dashboard.
 
-```{=html}
-<p align="center">
-```
-`<img src="https://img.shields.io/badge/Python-3.11-blue?logo=python">`{=html}
-`<img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi">`{=html}
-`<img src="https://img.shields.io/badge/Database-Supabase-3ECF8E?logo=supabase">`{=html}
-`<img src="https://img.shields.io/badge/Frontend-HTML%20%7C%20CSS%20%7C%20JavaScript-orange">`{=html}
-```{=html}
-</p>
-```
-**One place to monitor devices, understand network health, and track
-important events.**
-:::
+<img src="https://img.shields.io/badge/Python-3.11-blue?logo=python" />
+<img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi" />
+<img src="https://img.shields.io/badge/Database-Supabase-3ECF8E?logo=supabase" />
+<img src="https://img.shields.io/badge/Frontend-HTML%20%7C%20CSS%20%7C%20JavaScript-orange" />
+
+</div>
+
+---
+
+**One place to monitor devices, understand network health, and track important events.**
 
 ------------------------------------------------------------------------
 
