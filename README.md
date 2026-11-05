@@ -1,152 +1,48 @@
 # NetPulse
 
-NetPulse is a lightweight network monitoring dashboard built with Python, Flask, SQLAlchemy, Supabase PostgreSQL, HTML, CSS, vanilla JavaScript, and Chart.js. It checks devices with `ping`, records latency and status history, and creates useful alerts.
+NetPulse checks network devices, records latency and availability in Supabase PostgreSQL, and displays results in the existing HTML dashboard.
 
-## Architecture
+## Stack and structure
 
-```text
-Browser
-   ↓
-HTML + CSS + Vanilla JavaScript
-   ↓
-Flask
-   ↓
-SQLAlchemy
-   ↓
-Supabase PostgreSQL
-```
+- FastAPI serves the pages and JSON APIs; `/docs` and `/redoc` show interactive API documentation.
+- SQLAlchemy maps the existing `users`, `devices`, `monitoring_results`, `alerts`, and `activity_logs` tables.
+- Jinja2 renders the original pages. Existing CSS and vanilla JavaScript remain in `app/static`.
+- `app/main.py` contains the routes and application setup; `app/database.py` creates database sessions; `app/models.py` describes database rows; `app/schemas.py` validates device input; `app/services` contains monitoring and alert rules.
 
-The browser communicates only with Flask. Supabase is the hosted PostgreSQL database; no database credentials or Supabase service keys are sent to the browser.
+## Setup
 
-Monitoring flow:
-
-```text
-Background Monitoring Worker
-   ↓
-Network Reachability Check
-   ↓
-Latency Measurement
-   ↓
-Device Status
-   ↓
-SQLAlchemy
-   ↓
-Supabase PostgreSQL
-   ↓
-Flask API
-   ↓
-Dashboard
-```
-
-## Supabase setup
-
-1. Create a project at [Supabase](https://supabase.com/).
-2. Open its database connection settings.
-3. Copy the PostgreSQL connection string in `psycopg` SQLAlchemy format.
-4. Copy `.env.example` to `.env`.
-5. Put the connection string in `DATABASE_URL`. Never commit `.env`.
-6. Run `python init_db.py`.
-7. Start Flask with `python run.py`.
-
-Example `.env` (placeholders only):
-
-```env
-SECRET_KEY=replace-with-a-long-random-value
-DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/DATABASE
-INITIAL_ADMIN_PASSWORD=choose-a-unique-password-at-least-12-chars
-MONITOR_INTERVAL=10
-LATENCY_WARNING_MS=100
-LATENCY_CRITICAL_MS=200
-```
-
-Do not put Supabase API keys, service-role keys, passwords, or connection strings in source code, templates, JavaScript, or Git.
-
-## Run locally
+Use Python 3.11 or newer. Create `.env` from `.env.example` and enter the existing Supabase PostgreSQL URL and a long random secret. Keep `.env` private.
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
-# Edit .env and set SECRET_KEY, DATABASE_URL, and INITIAL_ADMIN_PASSWORD.
+# Edit .env and set DATABASE_URL, SECRET_KEY, and INITIAL_ADMIN_PASSWORD.
 python init_db.py
 python run.py
 ```
 
-Open `http://127.0.0.1:5000`.
+Open http://127.0.0.1:8000. The app checks database connectivity at startup and does not create, drop, or rebuild tables. Keep the existing Supabase schema and connection string in `.env`.
 
-`init_db.py` can be run repeatedly. It creates missing tables and only adds missing starter users and demo devices.
+`.env` settings: `DATABASE_URL`, `SECRET_KEY`, `INITIAL_ADMIN_PASSWORD`, `MONITOR_INTERVAL` (seconds), `LATENCY_WARNING_MS`, `LATENCY_CRITICAL_MS`, `START_MONITORING`, and optionally `COOKIE_SECURE=true` behind HTTPS.
 
-On a new database, `init_db.py` creates the `admin` account using
-`INITIAL_ADMIN_PASSWORD`. Existing users are kept, and no sample devices or
-default accounts are inserted. Add real devices from the Devices page.
+## API and workflow
 
-## Import old SQLite data
+The browser sends same-origin fetch requests to the FastAPI JSON routes. FastAPI checks the signed session cookie, validates input with Pydantic, and uses a short-lived SQLAlchemy session to read or write PostgreSQL. Server-rendered pages use the same Jinja templates as before.
 
-The old local database is not deleted. If you want to keep its data, configure `.env` first, then run:
+Important APIs include `/api/dashboard/summary`, `/api/dashboard/activity`, `/api/devices`, `/api/alerts`, and `/api/logs`. Device create, update, delete, acknowledgement, and monitoring controls require an administrator. All state-changing browser requests include the CSRF token rendered into the page.
 
-```powershell
-python import_sqlite.py instance/network_monitor.db
-```
+FastAPI documentation: http://127.0.0.1:8000/docs and http://127.0.0.1:8000/redoc.
 
-The importer copies users, devices, monitoring results, alerts, and activity logs in foreign-key order. It skips primary keys already present in PostgreSQL, so rerunning it does not duplicate imported rows.
+## Monitoring
 
-## Database schema
+At startup, one background thread periodically reads enabled device IDs, pings each device, and saves a result using a separate SQLAlchemy session per check. A failure for one device is logged and does not prevent other checks. Alert rules run on status transitions, so repeated failures do not create repeated active alerts. On shutdown the app signals the thread and waits up to five seconds.
 
-| Table | Purpose |
-| --- | --- |
-| `users` | Login username, password hash, role, and creation time. |
-| `devices` | Monitored devices and their current health. |
-| `monitoring_results` | One saved reachability and latency check. |
-| `alerts` | Device-down, recovery, and high-latency conditions. |
-| `activity_logs` | A simple audit trail of device and alert events. |
-
-```text
-Device → MonitoringResult
-Device → Alert
-Device → ActivityLog
-```
-
-All application timestamps are stored as UTC values. The dashboard converts them to the browser's local time for display.
-
-## How monitoring works
-
-`run.py` starts one background thread. Every `MONITOR_INTERVAL` seconds it reads enabled devices from PostgreSQL, pings each device, saves a monitoring result, updates the latest device status, and applies alert rules.
-
-- No ping response: `OFFLINE`
-- Response over `LATENCY_WARNING_MS`: `WARNING`
-- Other response: `ONLINE`
-- Repeated failures do not duplicate a down alert.
-- An offline device that responds again receives a recovery alert.
-
-Uptime is successful (`ONLINE` or `WARNING`) checks divided by all checks in the requested period, multiplied by 100.
-
-## Project guide
-
-- `config.py` reads safe configuration from environment variables.
-- `app/models.py` defines the PostgreSQL tables, indexes, and relationships.
-- `app/routes/` contains Flask pages and JSON APIs.
-- `app/services/monitoring_service.py` contains the ping worker.
-- `app/services/alert_service.py` contains transition-based alert rules.
-- `init_db.py` creates tables and starter data.
-- `import_sqlite.py` is the optional one-time legacy data importer.
-- `tests/` uses an isolated in-memory SQLite database and mocked network checks; production runtime uses Supabase PostgreSQL.
-
-## APIs
-
-- Dashboard: `GET /api/dashboard/summary`, `/latency`, `/alerts`, `/activity`
-- Devices: `GET|POST /api/devices`, `GET|PUT|DELETE /api/devices/<id>`
-- Monitoring: `PATCH /api/devices/<id>/monitoring`
-- Device history: `GET /api/devices/<id>/history`, `/uptime`
-- Alerts: `GET /api/alerts`, `PATCH /api/alerts/<id>/acknowledge`
-- Logs: `GET /api/logs`
+Ping may be blocked by a firewall or network policy. Latency is measured from the computer running NetPulse.
 
 ## Tests
 
 ```powershell
 pytest
 ```
-
-## Important limitation
-
-Ping can be blocked by a firewall, operating system configuration, or network policy. Latency is measured from the computer running NetPulse, not from an external monitoring server.

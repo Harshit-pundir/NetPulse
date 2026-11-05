@@ -1,91 +1,71 @@
 from datetime import datetime
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from .database import Base
 
-from flask_login import UserMixin
 
-from .extensions import db
-
-
-class User(UserMixin, db.Model):
-    """A person who can sign in to NetPulse."""
-
+class User(Base):
     __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="VIEWER")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(16), nullable=False, default="VIEWER")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-
-class Device(db.Model):
-    """A network device that NetPulse can monitor."""
-
+class Device(Base):
     __tablename__ = "devices"
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    ip_address = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    hostname = db.Column(db.String(255))
-    device_type = db.Column(db.String(30), nullable=False, default="OTHER")
-    location = db.Column(db.String(120))
-    description = db.Column(db.Text)
-    monitoring_enabled = db.Column(db.Boolean, nullable=False, default=True)
-    status = db.Column(db.String(16), nullable=False, default="UNKNOWN", index=True)
-    current_latency = db.Column(db.Float)
-    last_checked_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    results = db.relationship("MonitoringResult", backref="device", lazy="dynamic", cascade="all, delete-orphan")
-    alerts = db.relationship("Alert", backref="device", lazy="dynamic", cascade="all, delete-orphan")
-    activity_logs = db.relationship("ActivityLog", backref="device", lazy="dynamic", cascade="all, delete-orphan")
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    ip_address: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    hostname: Mapped[str | None] = mapped_column(String(255))
+    device_type: Mapped[str] = mapped_column(String(30), nullable=False, default="OTHER")
+    location: Mapped[str | None] = mapped_column(String(120))
+    description: Mapped[str | None] = mapped_column(Text)
+    monitoring_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="UNKNOWN", index=True)
+    current_latency: Mapped[float | None] = mapped_column(Float)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    results: Mapped[list["MonitoringResult"]] = relationship(back_populates="device", cascade="all, delete-orphan")
+    alerts: Mapped[list["Alert"]] = relationship(back_populates="device", cascade="all, delete-orphan")
+    activity_logs: Mapped[list["ActivityLog"]] = relationship(back_populates="device", cascade="all, delete-orphan")
 
 
-class MonitoringResult(db.Model):
-    """One reachability check for a device."""
-
+class MonitoringResult(Base):
     __tablename__ = "monitoring_results"
-    __table_args__ = (
-        db.Index("ix_monitoring_results_device_checked_at", "device_id", "checked_at"),
-    )
-
-    id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=False, index=True)
-    status = db.Column(db.String(16), nullable=False, index=True)
-    latency = db.Column(db.Float)
-    response_time = db.Column(db.Float)
-    checked_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
-    error_message = db.Column(db.String(500))
+    __table_args__ = (Index("ix_monitoring_results_device_checked_at", "device_id", "checked_at"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    latency: Mapped[float | None] = mapped_column(Float)
+    response_time: Mapped[float | None] = mapped_column(Float)
+    checked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    error_message: Mapped[str | None] = mapped_column(String(500))
+    device: Mapped[Device] = relationship(back_populates="results")
 
 
-class Alert(db.Model):
-    """A device condition that may need a user's attention."""
-
+class Alert(Base):
     __tablename__ = "alerts"
-    __table_args__ = (
-        db.Index("ix_alerts_device_created_at", "device_id", "created_at"),
-    )
-
-    id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=False, index=True)
-    alert_type = db.Column(db.String(30), nullable=False, index=True)
-    severity = db.Column(db.String(16), nullable=False, index=True)
-    message = db.Column(db.String(500), nullable=False)
-    acknowledged = db.Column(db.Boolean, nullable=False, default=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
-    acknowledged_at = db.Column(db.DateTime)
+    __table_args__ = (Index("ix_alerts_device_created_at", "device_id", "created_at"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"), nullable=False, index=True)
+    alert_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime)
+    device: Mapped[Device] = relationship(back_populates="alerts")
 
 
-class ActivityLog(db.Model):
-    """A simple audit trail for device and alert events."""
-
+class ActivityLog(Base):
     __tablename__ = "activity_logs"
-    __table_args__ = (
-        db.Index("ix_activity_logs_device_created_at", "device_id", "created_at"),
-    )
-
-    id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey("devices.id"), nullable=True, index=True)
-    event_type = db.Column(db.String(50), nullable=False, index=True)
-    message = db.Column(db.String(500), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    __table_args__ = (Index("ix_activity_logs_device_created_at", "device_id", "created_at"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_id: Mapped[int | None] = mapped_column(ForeignKey("devices.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    device: Mapped[Device | None] = relationship(back_populates="activity_logs")

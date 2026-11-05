@@ -1,24 +1,11 @@
 from datetime import datetime, timedelta
-
+from sqlalchemy import select
 from ..models import MonitoringResult
 
 
-def uptime_for(device_id, hours):
-    """Return the percentage of successful checks in the selected time window."""
-    start_time = datetime.utcnow() - timedelta(hours=hours)
-    results = MonitoringResult.query.filter_by(device_id=device_id).filter(
-        MonitoringResult.checked_at >= start_time,
-        MonitoringResult.status != "MONITOR_ERROR",
-    ).all()
-
-    total_checks = len(results)
-    if total_checks == 0:
-        return None
-
-    online_checks = 0
-    for result in results:
-        if result.status in ("ONLINE", "WARNING", "CRITICAL"):
-            online_checks += 1
-
-    # A warning is still a successful reachability check.
-    return round((online_checks / total_checks) * 100, 2)
+def uptime_for(session, device_id, hours):
+    start = datetime.utcnow() - timedelta(hours=hours)
+    rows = session.scalars(select(MonitoringResult).where(MonitoringResult.device_id == device_id, MonitoringResult.checked_at >= start, MonitoringResult.status != "MONITOR_ERROR")).all()
+    if not rows: return None
+    successful = sum(row.status in ("ONLINE", "WARNING", "CRITICAL") for row in rows)
+    return round(successful / len(rows) * 100, 2)
